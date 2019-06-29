@@ -1,0 +1,144 @@
+#!/usr/bin/env bash
+
+#=============================CABEÇALHO======================================|
+#
+#  AUTOR
+#     Felipe Fernandes <felipefernandesgsc@gmail.com>
+#
+#  PROGRAMA
+#     Check-Request
+#
+#  DATA DE CRIAÇÃO
+#     28/06/2019
+#
+#  DESCRIÇÃO
+#     Realiza  um request em endereços pré definidos, apresentando na tela o
+#   resultado desses requests. Não é feito os requests em modo loop para não
+#   aparentar um ataque DOS, evitando assim bloqueio do IP no domínio regis-
+#   trado.
+#
+#============================================================================|
+
+#==========================================TESTES
+
+#Testa existencia do curl no sistema
+if [ ! -n "$(which curl)" ]
+   then
+   echo -e "Programa \"curl\" não encontrado no sistema.\nPor favor, instale-o primeiramente para poder usar o este programa"
+   exit 2
+fi
+
+#Testa a existência do arquivo de lista de URLs
+if [ ! -e $HOME/.request_list.txt ]
+   then
+   echo -e "\nCriando arquivo de lista de sites para testes (.request_list.txt)...\n"
+   touch $HOME/.request_list.txt \
+   || { echo -e "Erro ao criar arquivo\n Por favor, crie o arquivo .request_list.txt em seu diretório $HOME manualmente"; exit 2; }
+fi
+
+#================================================
+
+#==========================================INICIO
+while : ; do
+clear
+   cat << END
+
+	CHECK REQUEST
+
+1) Realizar checagem
+2) Registrar site
+3) Deletar site
+4) Imprimir sites registrados
+
+0) Sair do programa
+
+END
+   read -p "Escolha uma opção: " opc
+
+   case $opc in
+	0)
+	break ;;
+
+	1)
+	echo -e "\tCHECK REQUEST\n\n" >> $HOME/.cache.txt
+	while read linha
+	   do
+	   nome=$(echo $linha | cut -d\| -f 1)
+	   url=$(echo $linha | cut -d\| -f 2)
+	   request=$(curl -L -s -o /dev/null -w %{http_code} ${url})
+	   echo -e "Site:${nome} Request:${request}" >> $HOME/.cache.txt
+	   clear
+	   cat $HOME/.cache.txt | column -t
+	done < $HOME/.request_list.txt
+	rm $HOME/.cache.txt
+	read -p "Pressione ENTER para continuar"
+	;;
+
+	2)
+	while : ; do
+	   read -p "Digite o nome do site que será registrado: " nome
+	   read -p "Digite a URL do site: " url
+	   nome=$( echo "$nome" | tr ' ' _)
+	   clear
+	   cat << END
+
+	Confirmação
+
+Nome: $nome
+URL: $url
+
+As informações estão corretas? [s/n]
+END
+	   read confirm
+	   confirm="${confirm,,}"
+	   if [ "$confirm" = "s" ]
+		then
+		break
+	   fi
+	done
+	echo "${nome}|${url}" >> $HOME/.request_list.txt
+	;;
+
+	3)
+	while : ; do
+	    echo
+	    lista=$(cat -n $HOME/.request_list.txt | sed 's/\s\+/ /g' | tr \| ' ' | cut -d ' ' -f 2,3,4)
+	    echo -e "\nDeletar\n${lista}" | column -t
+	    echo
+	    read -p "Selecione o número do site que será deletado: " del
+	    confirm=$(cat -n $HOME/.request_list.txt | head -n ${del} | tail -n 1 | sed 's/\s\+/ /g' | tr \| ' ' | cut -d ' ' -f 3)
+	    echo -e "\nO site \"${confirm}\" será deletado"
+	    read -p "Tem certeza desta ação? [s/n]" confirmacao
+	    confirmacao="${confirmacao,,}"
+		if [ "$confirmacao" = "s" ] ; then
+		echo -e "\nConfirmação aprovada\nDeletando..."
+		sed -i ${del}d $HOME/.request_list.txt && echo -e "\nSite \"$confirm\" deletado com sucesso\n"
+		break
+		   else
+		   echo -e "\nConfirmação negada\n"
+		   break
+		fi
+	done
+	read -p "Pressione ENTER para prosseguir"
+	;;
+
+	4)
+	echo
+	while read linha
+	   do
+	   nome=$(echo $linha | cut -d\| -f 1)
+	   url=$(echo $linha | cut -d\| -f 2)
+	   echo "Site:${nome} URL:${url}" >> $HOME/.cache.txt
+	done < $HOME/.request_list.txt
+	cat $HOME/.cache.txt | column -t
+	rm $HOME/.cache.txt
+	read -p "Pressione ENTER para proseguir"
+	;;
+
+	*)
+	echo -e "Opção Inválida...\n"
+	read -p "Pressione ENTER para prosseguir"
+	;;
+   esac
+done
+#================================================
